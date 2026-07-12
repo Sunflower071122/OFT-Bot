@@ -2,6 +2,7 @@ package dev.reassembly.commands.impl.config
 
 import dev.reassembly.commands.BaseCommand
 import dev.reassembly.database.DatabaseHandler
+import dev.reassembly.models.Server
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import net.dv8tion.jda.api.Permission
@@ -10,6 +11,35 @@ import net.dv8tion.jda.api.entities.channel.concrete.ThreadChannel
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent
 
 object ConfigCommand: BaseCommand("config") {
+
+    /**
+     * Represents an option one can select when changing the game channel
+     */
+    private data class GameChannelSelection (
+        val runChannelSetter: (server: Server, channelId: String) -> Unit,
+        val breakingMessage: String? = null,
+    )
+
+    private val gameChannelSelectionMap: Map<String, GameChannelSelection> = mapOf(
+        "change" to GameChannelSelection({server, channelId -> server.changeChannel = channelId}),
+        "letter" to GameChannelSelection({server, channelId -> server.letterChannel = channelId}, "Start your letter here:"),
+        "pattern" to GameChannelSelection({server, channelId -> server.patternChannel = channelId}, "Start pattern game here:"),
+        "freezetag" to GameChannelSelection({server, channelId -> server.freezeTagChannel = channelId}),
+        "lateforwork" to GameChannelSelection({server, channelId -> server.lateForWorkChannel = channelId}),
+        "partyquirks" to GameChannelSelection({server, channelId -> server.partyQuirksChannel = channelId}),
+        "bedtimestories" to GameChannelSelection({server, channelId -> server.bedtimeStoriesChannel = channelId}),
+        "timewarp" to GameChannelSelection({server, channelId -> server.timeWarpChannel = channelId}),
+        "guessinggame" to GameChannelSelection({server, channelId -> server.guessingGameChannel = channelId}),
+        "seventhings" to GameChannelSelection({server, channelId -> server.sevenThingsChannel = channelId}),
+        "book" to GameChannelSelection({server, channelId -> server.bookChannel = channelId}),
+        "longform" to GameChannelSelection({server, channelId -> server.longFormChannel = channelId}),
+        "genre" to GameChannelSelection({server, channelId -> server.genreChannel = channelId}),
+        "alphabet" to GameChannelSelection({server, channelId -> server.alphabetChannel = channelId}),
+        "flurry" to GameChannelSelection({server, channelId -> server.flurryChannel = channelId}),
+        "pillars" to GameChannelSelection({server, channelId -> server.pillarsChannel = channelId}),
+        "chain" to GameChannelSelection({server, channelId -> server.chainChannel = channelId}, "Start chain game here:")
+    )
+
     override suspend fun execute(event: SlashCommandInteractionEvent) {
 
         val server = DatabaseHandler.getServer(event.guild!!.id)
@@ -26,99 +56,26 @@ object ConfigCommand: BaseCommand("config") {
             "channels" -> {
 
                 val channel = event.getOption("channel")!!.asChannel
-                when (event.getOption("game")!!.asString) {
 
-                    "change" -> {
-                        server.changeChannel = channel.id
-                        event.reply("Set Change channel to " + channel.asMention).queue()
-                    }
-                    "letter" -> {
-                        server.letterChannel = channel.id
-                        event.reply("Set Letter channel to " + channel.asMention).queue()
-                        if (channel is TextChannel || channel is ThreadChannel) {
-                            channel.sendMessage("Start your letter here:").queue()
+                val gameOption = event.getOption("game")!!.asString
+
+                // Now Playing is a special case since we store the message ID too, handling this separately
+                if (gameOption == "nowplaying") {
+                    server.currentlyPlayingMessageChannel = channel.id
+                    if (channel is TextChannel || channel is ThreadChannel) {
+                        val nowPlayingMessage = withContext(Dispatchers.IO) {
+                            channel.sendMessage("Currently Active Games").complete()
                         }
+                        server.currentlyPlayingMessageId = nowPlayingMessage.id
                     }
-                    "pattern" -> {
-                        server.patternChannel = channel.id
-                        event.reply("Set Pattern channel to " + channel.asMention).queue()
-                        if (channel is TextChannel || channel is ThreadChannel) {
-                            channel.sendMessage("Start pattern game here:").queue()
-                        }
-                    }
-                    "freezetag" -> {
-                        server.freezeTagChannel = channel.id
-                        event.reply("Set Freeze Tag channel to " + channel.asMention).queue()
-                    }
-                    "lateforwork" -> {
-                        server.lateForWorkChannel = channel.id
-                        event.reply("Set Late For Work channel to " + channel.asMention).queue()
-                    }
-                    "partyquirks" -> {
-                        server.partyQuirksChannel = channel.id
-                        event.reply("Set Party Quirks channel to " + channel.asMention).queue()
-                    }
-                    "bedtimestories" -> {
-                        server.bedtimeStoriesChannel = channel.id
-                        event.reply("Set Bedtime Stories channel to " + channel.asMention).queue()
-                    }
-                    "timewarp" -> {
-                        server.timeWarpChannel = channel.id
-                        event.reply("Set Time Warp channel to " + channel.asMention).queue()
-                    }
-                    "guessinggame" -> {
-                        server.guessingGameChannel = channel.id
-                        event.reply("Set Guessing Game channel to " + channel.asMention).queue()
-                    }
-                    "seventhings" -> {
-                        server.sevenThingsChannel = channel.id
-                        event.reply("Set Seven Things channel to " + channel.asMention).queue()
-                    }
-                    "nowplaying" -> {
-                        server.currentlyPlayingMessageChannel = channel.id
-                        if (channel is TextChannel || channel is ThreadChannel) {
-                            val nowPlayingMessage = withContext(Dispatchers.IO) {
-                                channel.sendMessage("Currently Active Games").complete()
-                            }
-                            server.currentlyPlayingMessageId = nowPlayingMessage.id
-                        }
-                        event.reply("Set Now Playing channel to " + channel.asMention).queue()
-                    }
-                    "book" -> {
-                        server.bookChannel = channel.id
-                        event.reply("Set Book channel to " + channel.asMention).queue()
-                    }
-                    "longform" -> {
-                        server.longFormChannel = channel.id
-                        event.reply("Set Longform channel to " + channel.asMention).queue()
-                    }
-                    "genre" -> {
-                        server.genreChannel = channel.id
-                        event.reply("Set Genre channel to " + channel.asMention).queue()
-                    }
-                    "alphabet" -> {
-                        server.alphabetChannel = channel.id
-                        event.reply("Set Alphabet channel to " + channel.asMention).queue()
-                    }
-                    "flurry" -> {
-                        server.flurryChannel = channel.id
-                        event.reply("Set Flurry channel to " + channel.asMention).queue()
-                    }
-                    "pillars" -> {
-                        server.pillarsChannel = channel.id
-                        event.reply("Set Pillars channel to " + channel.asMention).queue()
-                    }
-                    "chain" -> {
-                        server.chainChannel = channel.id
-                        event.reply("Set Chain channel to " + channel.asMention).queue()
-                        if (channel is TextChannel || channel is ThreadChannel) {
-                            channel.sendMessage("Start chain game here:").queue()
-                        }
-                    }
-                    else -> {
-                        event.reply("Could not find game").setEphemeral(true).queue()
-                    }
+                    event.reply("Set Now Playing channel to " + channel.asMention).queue()
                 }
+                val game = gameChannelSelectionMap[gameOption] ?: run {
+                    event.reply("Could not find game").setEphemeral(true).queue()
+                    return
+                }
+                game.runChannelSetter(server, channel.id)
+
                 server.save()
             }
         }
